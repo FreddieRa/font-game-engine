@@ -19,7 +19,7 @@
     <div style="position: relative; z-index: 5; display: flex; flex-flow: column; align-items: center;">
 
         <h1 class="bordered">
-            Fontemon image to CharStringConverter
+            Fontemon image to CharStringConverter v1.2
         </h1>
 
         <div class="bordered">
@@ -48,6 +48,11 @@
             <button id="undo-button">Undo</button>
             <label>Scale:</label>
             <input type="number" id="scale" min="1" step="0.5" value="1">
+        </div>
+        <div class="bordered" style="margin-bottom: 30px;">
+            <button id="guess-button">Guess</button>
+            <label>Threshold:</label>
+            <input type="range" id="threshold" min="1" max="100" step="0.5" value="1">
         </div>
         <div  class="bordered" style="margin-bottom: 40px;">
             <div>

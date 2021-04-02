@@ -809,6 +809,77 @@ const replaceInputColorWithOutputColor = (outputColorKey, imageData, oldColor) =
     }
 };
 
+const guessAllColors = (threshold, imageData, oldColors) => {
+    let options = Object.values(defaultColors).flat(1);
+    console.log(oldColors)
+
+    let newColors = []
+
+    for (let oldColor of oldColors) {
+
+        let color = oldColor.color
+        // Get a list with the index of each default and how close it is to the color
+        // e.g [[0,0,0,255], ...] => [[0, 1.2], ...]
+        let results = options.map((element, index) => [index, deltaE(element, color)]);
+
+        // Sort by second element
+        let sorted = results.sort((a,b) =>  a[1] > b[1]); 
+        console.log("sorted: " + JSON.stringify(sorted))
+        let min = sorted[0];
+
+        // if colors close enough
+        if (min[1] <= threshold) {
+            // Required to map both flattened arrays to transparent
+            let colorKey = ["black", 
+                            "transparent", 
+                            "transparent", 
+                            "lightGray", 
+                            "darkGray"][min[0]]
+            replaceInputColorWithOutputColor(colorKey, imageData, oldColor);
+        } else {
+            newColors.push(oldColor);
+        }
+    }
+
+    return newColors;
+
+}
+
+const deltaE = (rgbA, rgbB) => {
+    if(rgbA[3] != rgbB[3]){return 10000}
+    let labA = rgb2lab(rgbA);
+    let labB = rgb2lab(rgbB);
+    let deltaL = labA[0] - labB[0];
+    let deltaA = labA[1] - labB[1];
+    let deltaB = labA[2] - labB[2];
+    let c1 = Math.sqrt(labA[1] * labA[1] + labA[2] * labA[2]);
+    let c2 = Math.sqrt(labB[1] * labB[1] + labB[2] * labB[2]);
+    let deltaC = c1 - c2;
+    let deltaH = deltaA * deltaA + deltaB * deltaB - deltaC * deltaC;
+    deltaH = deltaH < 0 ? 0 : Math.sqrt(deltaH);
+    let sc = 1.0 + 0.045 * c1;
+    let sh = 1.0 + 0.015 * c1;
+    let deltaLKlsl = deltaL / (1.0);
+    let deltaCkcsc = deltaC / (sc);
+    let deltaHkhsh = deltaH / (sh);
+    let i = deltaLKlsl * deltaLKlsl + deltaCkcsc * deltaCkcsc + deltaHkhsh * deltaHkhsh;
+    return i < 0 ? 0 : Math.sqrt(i);
+}
+  
+const rgb2lab = (rgb) => {
+    let r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255, x, y, z;
+    r = (r > 0.04045) ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
+    g = (g > 0.04045) ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
+    b = (b > 0.04045) ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
+    x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
+    y = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 1.00000;
+    z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
+    x = (x > 0.008856) ? Math.pow(x, 1/3) : (7.787 * x) + 16/116;
+    y = (y > 0.008856) ? Math.pow(y, 1/3) : (7.787 * y) + 16/116;
+    z = (z > 0.008856) ? Math.pow(z, 1/3) : (7.787 * z) + 16/116;
+    return [(116 * y) - 16, 500 * (x - y), 200 * (y - z)]
+}
+
 const replaceImageDataWithGuessedColors = ({ width, height, data }, colors) => {
     const bitWidth = 4;
     const stride = bitWidth * width;
@@ -916,6 +987,7 @@ class Converter {
         this.width = 500;
         this.height = 500;
         this.scale = 1;
+        this.threshold = 1;
         this.imageStartX = 70;
         this.imageStartY = 70;
         this.undoStack = [];
@@ -1006,10 +1078,20 @@ class Converter {
                 this.setFileNameInput(image.fileName);
                 this.currentColors = currentColors;
             });
+            document.getElementById("guess-button").addEventListener("click", () => {
+                if (!this.image) {
+                    return;
+                }
+                console.log("guess clicked")
+                this.replaceAllColors();
+            });
             document.getElementById("scale").addEventListener("change", (e) => {
                 this.context.resetTransform();
                 this.scale = e.target.value;
                 this.context.scale(this.scale, this.scale);
+            });
+            document.getElementById("threshold").addEventListener("change", (e) => {
+                this.threshold = e.target.value;
             });
             document
                 .getElementById("save-both")
@@ -1178,6 +1260,33 @@ class Converter {
             }
             replaceInputColorWithOutputColor(outputColorKey, this.image.data, oldColor);
             for (const [i, color] of this.currentColors.entries()) {
+                console.log("i: " + i + " color: " + JSON.stringify(color))
+                color.position.y = yPositionCurrentColor(i);
+            }
+        };
+        this.replaceAllColors = () => {
+            if (!this.image) {
+                return;
+            }
+            const newData = new ImageData(this.image.data.width, this.image.data.height);
+            newData.data.set(this.image.data.data);
+            this.undoStack.push({
+                image: this.image,
+                currentColors: JSON.parse(JSON.stringify(this.currentColors)),
+            });
+            this.image = {
+                data: newData,
+                fileName: this.image.fileName,
+            };
+            if (this.undoStack.length >= 50) {
+                
+                this.undoStack.shift();
+            }
+            this.currentColors = guessAllColors(this.threshold, 
+                                                this.image.data, 
+                                                this.currentColors);
+            for (const [i, color] of this.currentColors.entries()) {
+                console.log("i: " + i + " color: " + JSON.stringify(color))
                 color.position.y = yPositionCurrentColor(i);
             }
         };
