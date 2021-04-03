@@ -824,7 +824,6 @@ const guessAllColors = (threshold, imageData, oldColors) => {
 
         // Sort by second element
         let sorted = results.sort((a,b) =>  a[1] > b[1]); 
-        console.log("sorted: " + JSON.stringify(sorted))
         let min = sorted[0];
 
         // if colors close enough
@@ -840,7 +839,7 @@ const guessAllColors = (threshold, imageData, oldColors) => {
             newColors.push(oldColor);
         }
     }
-
+    console.log("new colors: " + JSON.stringify(newColors))
     return newColors;
 
 }
@@ -1082,7 +1081,6 @@ class Converter {
                 if (!this.image) {
                     return;
                 }
-                console.log("guess clicked")
                 this.replaceAllColors();
             });
             document.getElementById("scale").addEventListener("change", (e) => {
@@ -1260,7 +1258,6 @@ class Converter {
             }
             replaceInputColorWithOutputColor(outputColorKey, this.image.data, oldColor);
             for (const [i, color] of this.currentColors.entries()) {
-                console.log("i: " + i + " color: " + JSON.stringify(color))
                 color.position.y = yPositionCurrentColor(i);
             }
         };
@@ -1282,11 +1279,10 @@ class Converter {
                 
                 this.undoStack.shift();
             }
-            this.currentColors = guessAllColors(this.threshold, 
-                                                this.image.data, 
-                                                this.currentColors);
+            let colorsLeft = guessAllColors(this.threshold, this.image.data, this.currentColors);
+            console.log("Colors left: " + JSON.stringify(colorsLeft))
+            this.currentColors = getAllColorsFromAnImage(this.image.data, true).inputColors;
             for (const [i, color] of this.currentColors.entries()) {
-                console.log("i: " + i + " color: " + JSON.stringify(color))
                 color.position.y = yPositionCurrentColor(i);
             }
         };
